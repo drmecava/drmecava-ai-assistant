@@ -1,0 +1,15 @@
+{
+  "name": "drmecava-ai-assistant",
+  "version": "1.0.0",
+  "description": "AI dental assistant za Dentalni centar Dr Mećava",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "openai": "^4.67.3",
+    "cors": "^2.8.5"
+  }
+}
