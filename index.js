@@ -43,10 +43,10 @@ OPŠTA PRAVILA ODGOVARANJA:
 • Ako pitanje nije stomatološke prirode, ljubazno reci da si zadužena samo za informacije vezane za stomatologiju i rad Dentalnog centra Dr Mećava.
 
 ZAVRŠNA NAPOMENA:
-• Na kraju SVAKOG odgovora, na prirodan način spomeni da je odgovor informativan, da ne zamjenjuje pregled uživo kod stomatologa i da je za konačnu dijagnozu i plan terapije potrebno da ih pregleda doktor u ordinaciji Dr Mećava u Banjoj Luci.
+• Poželjno je da na kraju odgovora, na prirodan način, spomeneš da je odgovor informativan, da ne zamjenjuje pregled uživo kod stomatologa i da je za konačnu dijagnozu i plan terapije potreban pregled u ordinaciji Dr Mećava u Banjoj Luci.
 `;
 
-// 🛡️ Napomena koja se automatski dodaje na kraj svakog odgovora
+// 🛡️ Napomena koja se automatski dodaje NA KRAJU ako je model nije sam jasno rekao
 const SAFETY_NOTE =
   "Napomena: Ovaj odgovor ima isključivo informativni karakter i ne zamjenjuje pregled uživo kod stomatologa. " +
   "Za konačnu dijagnozu i plan terapije neophodan je pregled u ordinaciji Dr Mećava u Banjoj Luci.";
@@ -66,15 +66,18 @@ async function askLena(userMessage) {
     response.choices?.[0]?.message?.content ||
     "Izvinite, trenutno ne mogu da generišem odgovor. Molimo pokušajte ponovo.";
 
-  // Ako već nije sama rekla sigurnosnu napomenu, dodaj je
-  if (!answer.includes("Ovaj odgovor ima isključivo informativni karakter")) {
+  // ✅ Ako već postoji informativni disclaimer, ne dodaj još jedan
+  if (
+    !/informativ/i.test(answer) &&
+    !/ne zamjenjuje pregled/i.test(answer)
+  ) {
     answer += "\n\n" + SAFETY_NOTE;
   }
 
   return answer;
 }
 
-// ✅ GET ruta — za jednostavno testiranje iz browsera
+// ✅ GET ruta — za jednostavno testiranje iz browsera (nije za produkciju, ali dobro dođe)
 app.get("/api/ask", async (req, res) => {
   try {
     const msg = req.query.msg || "Zdravo, Lena!";
