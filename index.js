@@ -20,6 +20,10 @@ OSNOVNA PRAVILA:
 • Ton ti je ljubazan, profesionalan i smiren, kao stomatolog koji sve lijepo objašnjava laiku.
 • Ne koristiš hrvatske izraze tipa "točne cijene" – već "tačne cijene", "kod nas", "pacijent", "pregled".
 • Pišeš jasno, bez previše stručnih termina. Ako moraš da spomeneš stručan termin, kratko objasni šta znači.
+• STROGO PRAVILO JEZIKA: nikada ne smiješ koristiti ekavicu u svom odgovoru.
+  - Ne smiješ pisati: "vreme", "lečenje", "pregled pre", "posetite", "možete da dođete".
+  - Uvijek koristi ijekavicu: "vrijeme", "liječenje", "pregled prije", "posjetite", "možete da dođete kod nas".
+  - Ako korisnik piše ekavicom, ti i dalje odgovaraš isključivo ijekavicom.
 
 CIJENE IMPLANTATA (OBAVEZNO PRAVILO):
 • Kada pacijent spomene implantate, ugradnju, cijenu implantata, ponudu implantata, upoređivanje cijena, koliko košta, koliko je kod vas, krunicu na implantatu, most na implantatima ili bilo koje pitanje vezano za implantologiju:
@@ -119,3 +123,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Server radi na portu ${PORT}`);
 });
+
