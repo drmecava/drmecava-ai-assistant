@@ -6,90 +6,79 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 🔑 API ključ ide iz okoline (ENV varijabla na Render-u)
+// 🔑 OpenAI klijent – ključ uzima iz ENV varijable na Renderu
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// 🧠 PRAVILA PONAŠANJA – LENA
+// 🧠 Sistem poruka – pravila ponašanja za Lenu
 const SYSTEM_PROMPT =
   "Ti si Lena, AI asistent Dentalnog centra Dr Mećava u Banjoj Luci.\n\n" +
   "• Odgovaraš isključivo na srpskom jeziku, ijekavica, latinica.\n" +
   "• Ton ti je ljubazan, profesionalan i smiren, kao stomatolog koji sve lijepo objašnjava laiku.\n" +
-  "• Ne koristiš hrvatske izraze tipa 'točne cijene' – već 'tačne cijene', 'kod nas', 'pacijent', 'pregled'.\n\n" +
-  "• Kada te pacijent pita za cijenu implantata (cijena implantata, koliko košta implantat, koliko je implantat kod vas i slično), objasni sljedeće:\n" +
-  "  - U ordinaciji se koriste provjereni MIS implantati.\n" +
-  "  - Cijena kompletnog implantološkog rada (implantat + suprastruktura + krunica) iznosi oko 1250 € po zubu.\n" +
-  "  - To je otprilike 60–70% povoljnije nego iste usluge u Sloveniji ili Austriji.\n" +
-  "  - Naglasi da konačna cijena uvijek zavisi od pregleda, kvaliteta kosti i eventualnih dodatnih procedura (npr. nadogradnje kosti, sinus lift i sl.).\n" +
-  "  - Na kraju ih podstakni da pošalju ortopan ili zakažu besplatnu online procjenu preko sajta.\n\n" +
-  "• Za druge stomatološke teme (implantologija, protetika, ortodoncija, oralna hirurgija) odgovaraj stručno ali jednostavno, bez previše stručnih termina.\n" +
-  "• Ako nisi sigurna u tačnu cijenu nekog drugog zahvata, nemoj izmišljati broj – reci da cijena zavisi od pregleda i da nas mogu kontaktirati za tačan predračun.\n" +
-  "• Uvijek naglasi da AI savjet NE zamjenjuje pregled uživo kod stomatologa.";
+  "• Kada te pitaju za cijenu, daj okvirne vrijednosti i naglasi da je konačna cijena moguća tek nakon pregleda.\n" +
+  "• Ne izmišljaš medicinske činjenice, ako nešto ne znaš kažeš da je potrebna konsultacija sa doktorom.\n" +
+  "• Uvijek na kraju odgovora ponudiš mogućnost da pacijent pošalje ortopan ili zakaže besplatnu online procjenu.\n";
 
-// 🔁 GLAVNA RUTA NA KOJU SE JAVlja WIDGET
-app.post("/ask", async (req, res) => {
+// 👇 Pomoćna funkcija – pravi upit prema OpenAI
+async function askLena(userMessage) {
+  const response = await client.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: userMessage },
+    ],
+    temperature: 0.5,
+  });
+
+  const answer =
+    response.choices?.[0]?.message?.content ||
+    "Izvinite, trenutno ne mogu da generišem odgovor. Molimo pokušajte ponovo.";
+  return answer;
+}
+
+// ✅ GET ruta — da možeš da testiraš direktno iz browsera
+app.get("/api/ask", async (req, res) => {
   try {
-    const body = req.body || {};
-    const question = (body.message || body.question || "").trim();
-    const hasImage = !!body.image;
-
-    let userContent = question;
-
-    if (hasImage) {
-      // Za sada sliku samo tretiramo kao napomenu, ne analiziramo je direktno
-      userContent =
-        (question || "Pacijent je poslao samo sliku/ortopan bez teksta.") +
-        "\n\n(Napomena: pacijent je poslao sliku ili ortopan – koristi je samo kao dodatni kontekst, ali ne postavljaj dijagnozu na osnovu slike.)";
-    }
-
-    if (!userContent) {
-      return res.json({
-        answer:
-          "Molim vas da ukratko opišete problem ili pitanje (npr. 'Boli me zub gore lijevo' ili 'Koliko košta implantat?')."
-      });
-    }
-
-    const response = await client.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: userContent }
-      ],
-      temperature: 0.5
-    });
-
-    const answer =
-      response.choices?.[0]?.message?.content ||
-      "Izvinite, trenutno ne mogu da generišem odgovor. Molimo pokušajte ponovo.";
-
+    const msg = req.query.msg || "Zdravo, Lena!";
+    const answer = await askLena(msg);
     res.json({ answer });
   } catch (error) {
-    console.error("OpenAI / server error:", error);
-
-    let msg =
-      "Došlo je do greške na AI servisu. Molimo pokušajte ponovo ili nas direktno kontaktirajte na +387 51 215 801.";
-
-    // Ako istekne kredit ili neki drugi API problem
-    if (
-      error &&
-      error.error &&
-      typeof error.error.message === "string" &&
-      error.error.message.toLowerCase().includes("insufficient_quota")
-    ) {
-      msg =
-        "AI asistent je trenutno privremeno nedostupan zbog ograničenja na API servisu. " +
-        "Molimo pokušajte kasnije ili nas direktno kontaktirajte na +387 51 215 801.";
-    }
-
-    res.status(500).json({ answer: msg });
+    console.error("GET /api/ask greška:", error);
+    res.status(500).json({
+      error:
+        "Došlo je do greške na AI servisu. Molimo pokušajte ponovo ili nas direktno kontaktirajte na +387 51 215 801.",
+    });
   }
 });
 
-// 🚀 POKRETANJE SERVERA – Render koristi svoj PORT iz okoline
+// ✅ POST ruta — ovu ćemo koristiti iz tvog widgeta na sajtu
+app.post("/api/ask", async (req, res) => {
+  try {
+    const msg = req.body.message || "Zdravo, Lena!";
+    const answer = await askLena(msg);
+    res.json({ answer });
+  } catch (error) {
+    console.error("POST /api/ask greška:", error);
+    res.status(500).json({
+      error:
+        "Došlo je do greške na AI servisu. Molimo pokušajte ponovo ili nas direktno kontaktirajte na +387 51 215 801.",
+    });
+  }
+});
+
+// Mala poruka na rootu – da ne bude više 'Cannot GET /'
+app.get("/", (req, res) => {
+  res.send(
+    "✅ AI server drmecava-ai-assistant radi. Koristite /api/ask za pitanja (GET ili POST)."
+  );
+});
+
+// 🚀 Pokretanje servera
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log("AI asistent radi na portu " + PORT);
+  console.log(`✅ Server radi na portu ${PORT}`);
 });
+
 
 
