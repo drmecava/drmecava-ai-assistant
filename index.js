@@ -8,7 +8,7 @@ app.use(express.json());
 
 // 🔑 API ključ ide iz okoline (ENV varijabla na Render-u)
 const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 // 🧠 PRAVILA PONAŠANJA – LENA
@@ -91,3 +91,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log("AI asistent radi na portu " + PORT);
 });
+
+
