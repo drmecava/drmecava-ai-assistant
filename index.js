@@ -97,12 +97,13 @@ app.post("/api/voice", async (req, res) => {
 
     console.log("🔊 Generišem glas za tekst:", text.slice(0, 120), "...");
 
-    const audioResponse = await client.audio.speech.create({
-      model: "gpt-4o-mini-tts",
-      voice: "verse", // ženski / mekši glas; po potrebi probaj "nova" ili "ballad"
-      input: text,
-      speed: 0.9,     // sporije od 1.0 → smireniji, “25–30 godina”
-    });
+   const audioResponse = await client.audio.speech.create({
+  model: "gpt-4o-mini-tts",
+  voice: "shimmer",   // ✳ pokušaj 1 – ženstveniji glas
+  input: text,
+  speed: 0.9          // ostavljamo smiren tempo
+});
+
 
     const buffer = Buffer.from(await audioResponse.arrayBuffer());
 
@@ -122,3 +123,4 @@ const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log("🚀 Lena AI backend sluša na portu", PORT);
 });
+
