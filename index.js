@@ -1,4 +1,4 @@
-// index.js — Lena AI backend (OpenAI tekst + glas)
+// index.js — Lena AI backend (OpenAI tekst + glas, ženski ton)
 
 import express from "express";
 import cors from "cors";
@@ -19,18 +19,27 @@ Ti si Lena, AI asistent Dentalnog centra Dr Mećava u Banjoj Luci.
 
 OSNOVNA PRAVILA:
 - Odgovaraš isključivo na srpskom jeziku, ijekavica, latinica.
-- Ljubazna si, smirena i profesionalna kao stomatolog koji objašnjava laiku.
-- Ne koristiš birokratske izraze; umjesto "vaša cijenjena poruka" piši prirodno.
-- U svakom odgovoru podsjeti da konačnu dijagnozu daje doktor uživo u ordinaciji.
+- Pišeš prirodno, toplo i jasno, kao stomatolog koji objašnjava pacijentu.
+- Ton ti je smiren, ženstven i profesionalan, kao da imaš 25–30 godina.
+- Ne koristiš birokratske fraze; piši kao u normalnom razgovoru, ali stručno.
 
-IMPLANTOLOGIJA I CIJENE (VAŽNO ZA ODGOVORE):
-- Jedan MIS implantat + keramička krunica: oko 1.250 € (možeš navesti raspon, npr. 1.200–1.300 €).
-- Naglasi da je cijena okvirna i zavisi od snimka, kosti, dodatnih zahvata itd.
-- Istakni da su cijene u odnosu na Austriju/Sloveniju niže 60–70%, uz isti ili viši nivo kvaliteta.
+IMPLANTOLOGIJA I CIJENE:
+- Ako te pitaju za cijenu jednog implantata sa keramičkom krunicom:
+  objasni da se cijena najčešće kreće oko 1.250 € po zubu,
+  ali da je to okvirno i zavisi od snimka, kosti, dodatnih zahvata itd.
+- Naglasi da su cijene kod nas niže nego u Austriji ili Sloveniji,
+  jer su troškovi drugačiji, ali da koristimo savremene materijale i protokole.
 
-KAD JE HITNO:
-- Ako pacijent opisuje jaku bol, otok, temperaturu, širenje bola ili probleme s disanjem,
-  naglasi da se treba HITNO javiti doktoru ili hitnoj službi.
+O NARUČIVANJU:
+- Često predloži da pacijent pošalje ortopan i napiše šta želi da mijenja,
+  pa da na osnovu toga možemo dati okviran plan i ponudu.
+- Ako neko opisuje jaku bol, otok, temperaturu ili probleme sa disanjem,
+  savjetuj da se javno HITNO javi stomatologu ili hitnoj službi.
+
+OGRANIČENJA:
+- Ne daješ konačnu dijagnozu; sve što pišeš je informativno.
+- Uvijek napomeni da plan terapije i konačnu odluku donosi doktor
+  u ordinaciji Dr Mećava u Banjoj Luci.
 `;
 
 // ✅ Pomoćna funkcija za generisanje teksta odgovora
@@ -46,7 +55,10 @@ async function generateAnswer(userMessage) {
   });
 
   const answer = response.choices[0]?.message?.content?.trim();
-  return answer || "Nažalost, trenutno ne mogu dati precizan odgovor. Molim vas da nas kontaktirate direktno.";
+  return (
+    answer ||
+    "Nažalost, trenutno ne mogu da dam precizan odgovor. Molim vas da nas kontaktirate direktno ili dođete na pregled."
+  );
 }
 
 // 🟢 Health-check ruta
@@ -54,7 +66,7 @@ app.get("/", (_req, res) => {
   res.send("Lena AI backend radi ✓");
 });
 
-// 📩 /api/ask – tekstualni odgovor za Lenu
+// 📩 /api/ask – tekstualni odgovor
 app.post("/api/ask", async (req, res) => {
   try {
     const { message } = req.body;
@@ -75,7 +87,7 @@ app.post("/api/ask", async (req, res) => {
   }
 });
 
-// 🔊 /api/voice – glasovni odgovor koristeći OpenAI TTS
+// 🔊 /api/voice – glasovni odgovor (OpenAI TTS, ženski ton, malo sporije)
 app.post("/api/voice", async (req, res) => {
   try {
     const { text } = req.body;
@@ -85,11 +97,11 @@ app.post("/api/voice", async (req, res) => {
 
     console.log("🔊 Generišem glas za tekst:", text.slice(0, 120), "...");
 
-    // OpenAI TTS – gpt-4o-mini-tts, ženski glas "alloy"
     const audioResponse = await client.audio.speech.create({
       model: "gpt-4o-mini-tts",
-      voice: "alloy",
+      voice: "verse", // ženski / mekši glas; po potrebi probaj "nova" ili "ballad"
       input: text,
+      speed: 0.9,     // sporije od 1.0 → smireniji, “25–30 godina”
     });
 
     const buffer = Buffer.from(await audioResponse.arrayBuffer());
@@ -98,7 +110,7 @@ app.post("/api/voice", async (req, res) => {
     res.setHeader("Content-Length", buffer.length);
     res.send(buffer);
   } catch (err) {
-    console.error("❌ Greška u /api/voice:", err.response?.data || err.message);
+    console.error("❌ Greška u /api/voice:", err);
     res.status(500).json({
       error: "Greška pri generisanju glasovnog odgovora.",
     });
