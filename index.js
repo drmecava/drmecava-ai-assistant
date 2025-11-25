@@ -81,7 +81,7 @@ async function askLena(userMessage) {
   return answer;
 }
 
-// ✅ GET ruta — za jednostavno testiranje iz browsera (nije za produkciju, ali dobro dođe)
+// ✅ GET ruta — za jednostavno testiranje iz browsera
 app.get("/api/ask", async (req, res) => {
   try {
     const msg = req.query.msg || "Zdravo, Lena!";
@@ -96,7 +96,7 @@ app.get("/api/ask", async (req, res) => {
   }
 });
 
-// ✅ POST ruta — ovo koristi tvoj widget na sajtu
+// ✅ POST ruta — koristi tvoj widget na sajtu
 app.post("/api/ask", async (req, res) => {
   try {
     const msg = req.body.message || "Zdravo, Lena!";
@@ -111,10 +111,73 @@ app.post("/api/ask", async (req, res) => {
   }
 });
 
+// 🔊 NOVO: ruta za glas – ElevenLabs TTS
+app.post("/api/voice", async (req, res) => {
+  try {
+    const { text } = req.body;
+
+    if (!text) {
+      return res.status(400).json({ error: "Nedostaje tekst za glas." });
+    }
+
+    const apiKey = process.env.ELEVENLABS_API_KEY;
+    const voiceId = process.env.ELEVENLABS_VOICE_ID;
+
+    if (!apiKey || !voiceId) {
+      console.error("Nema ELEVENLABS_API_KEY ili ELEVENLABS_VOICE_ID u env.");
+      return res.status(500).json({
+        error:
+          "Glasovni servis trenutno nije dostupan. Molimo kontaktirajte ordinaciju direktno.",
+      });
+    }
+
+    const ttsUrl = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
+
+    const ttsResponse = await fetch(ttsUrl, {
+      method: "POST",
+      headers: {
+        "xi-api-key": apiKey,
+        "Content-Type": "application/json",
+        Accept: "audio/mpeg",
+      },
+      body: JSON.stringify({
+        text,
+        model_id: "eleven_multilingual_v2",
+        voice_settings: {
+          stability: 0.6,
+          similarity_boost: 0.85,
+          style: 0.4,
+          use_speaker_boost: true,
+        },
+      }),
+    });
+
+    if (!ttsResponse.ok) {
+      console.error("ElevenLabs greška:", await ttsResponse.text());
+      return res.status(500).json({
+        error:
+          "Došlo je do greške na glasovnom servisu. Molimo pokušajte ponovo.",
+      });
+    }
+
+    const audioBuffer = await ttsResponse.arrayBuffer();
+    const audio = Buffer.from(audioBuffer);
+
+    res.set("Content-Type", "audio/mpeg");
+    res.send(audio);
+  } catch (error) {
+    console.error("POST /api/voice greška:", error);
+    res.status(500).json({
+      error:
+        "Došlo je do greške na glasovnom servisu. Molimo pokušajte ponovo.",
+    });
+  }
+});
+
 // Mala poruka na rootu – da ne bude više 'Cannot GET /'
 app.get("/", (req, res) => {
   res.send(
-    "✅ AI server drmecava-ai-assistant radi. Koristite /api/ask za pitanja (GET ili POST)."
+    "✅ AI server drmecava-ai-assistant radi. Koristite /api/ask i /api/voice za Lenu."
   );
 });
 
@@ -123,4 +186,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Server radi na portu ${PORT}`);
 });
-
