@@ -1,181 +1,112 @@
-// index.js – backend za Lenu (Render)
-
-// Ako koristiš "type": "module" u package.json, ovaj import stil je ispravan.
-// Ako nisi, zameni sa require(...) varijantama.
+// index.js — Lena AI backend (OpenAI tekst + glas)
 
 import express from "express";
 import cors from "cors";
 import OpenAI from "openai";
 
-// Ako Render koristi Node 18+, fetch već postoji globalno
-// ako ne, dodaj u package.json: "node-fetch" i ovde: import fetch from "node-fetch";
-
-// 🔑 Ključevi iz okruženja (Render → Environment)
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
-const ELEVENLABS_VOICE_ID =
-  process.env.ELEVENLABS_VOICE_ID || "EXAVITQu4vr4xnSDxMaL"; // možeš ovde staviti svoj voice ID
-
-if (!OPENAI_API_KEY) {
-  console.error("❌ OPENAI_API_KEY nije postavljen u env promjenljivama!");
-}
-if (!ELEVENLABS_API_KEY) {
-  console.error("❌ ELEVENLABS_API_KEY nije postavljen u env promjenljivama!");
-}
-
-const client = new OpenAI({ apiKey: OPENAI_API_KEY });
-
 const app = express();
-
-// ✅ CORS – dozvoli tvoj sajt
-app.use(
-  cors({
-    origin: [
-      "https://www.drmecava.com",
-      "https://drmecava.com",
-      "https://drmecava.webnode.page" // ako koristiš Webnode domen
-    ],
-    methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type"]
-  })
-);
-
+app.use(cors());
 app.use(express.json());
 
-// 🌡 Health check
-app.get("/", (req, res) => {
-  res.send("Lena AI backend radi ✔");
+// 🔑 OpenAI klijent – koristi OPENAI_API_KEY iz Render okruženja
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
-// 🧠 Sistem prompt – pravila ponašanja za Lenu
+// 🧠 Sistem poruka – pravila ponašanja za Lenu
 const SYSTEM_PROMPT = `
-Ti si Lena, AI asistent Dentalnog centra Dr Mećava iz Banje Luke.
+Ti si Lena, AI asistent Dentalnog centra Dr Mećava u Banjoj Luci.
 
-Govor i pisanje:
-- Odgovaraš na srpskom (ijekavica ili ekavica su obje prihvatljive, ali budi prirodna i topla).
-- Pišeš jasno, razumljivo, bez medicinskog žargona osim kad je potrebno.
-- Ne daješ konačnu dijagnozu – uvijek napominješ da je potreban pregled uživo.
+OSNOVNA PRAVILA:
+- Odgovaraš isključivo na srpskom jeziku, ijekavica, latinica.
+- Ljubazna si, smirena i profesionalna kao stomatolog koji objašnjava laiku.
+- Ne koristiš birokratske izraze; umjesto "vaša cijenjena poruka" piši prirodno.
+- U svakom odgovoru podsjeti da konačnu dijagnozu daje doktor uživo u ordinaciji.
 
-Fokus:
-- Pomažeš oko implantata, krunica, mostova, proteza, Hollywood smile-a, ortodoncije, oralne hirurgije, dječije stomatologije.
-- Objasniš razliku između različitih rješenja (npr. implantat vs. most).
-- Možeš spomenuti prednosti liječenja u Dr Mećava centru (iskustvo, tehnologija, cijena u odnosu na Austriju/Sloveniju itd.)
+IMPLANTOLOGIJA I CIJENE (VAŽNO ZA ODGOVORE):
+- Jedan MIS implantat + keramička krunica: oko 1.250 € (možeš navesti raspon, npr. 1.200–1.300 €).
+- Naglasi da je cijena okvirna i zavisi od snimka, kosti, dodatnih zahvata itd.
+- Istakni da su cijene u odnosu na Austriju/Sloveniju niže 60–70%, uz isti ili viši nivo kvaliteta.
 
-Granice:
-- Ne postavljaš dijagnozu.
-- Ne daješ hitne savjete koji odlažu odlazak doktoru; ako je bol jaka, otok, krvarenje → naglasi da treba što prije kod stomatologa ili u hitnu službu.
-
-Svaki odgovor završiš jednom kratkom rečenicom koja poziva na kontakt ili pregled, ali nenametljivo.
+KAD JE HITNO:
+- Ako pacijent opisuje jaku bol, otok, temperaturu, širenje bola ili probleme s disanjem,
+  naglasi da se treba HITNO javiti doktoru ili hitnoj službi.
 `;
 
-// ===============================
-//  /api/ask – tekstualni odgovor
-// ===============================
+// ✅ Pomoćna funkcija za generisanje teksta odgovora
+async function generateAnswer(userMessage) {
+  const response = await client.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: userMessage },
+    ],
+    temperature: 0.4,
+    max_tokens: 600,
+  });
+
+  const answer = response.choices[0]?.message?.content?.trim();
+  return answer || "Nažalost, trenutno ne mogu dati precizan odgovor. Molim vas da nas kontaktirate direktno.";
+}
+
+// 🟢 Health-check ruta
+app.get("/", (_req, res) => {
+  res.send("Lena AI backend radi ✓");
+});
+
+// 📩 /api/ask – tekstualni odgovor za Lenu
 app.post("/api/ask", async (req, res) => {
   try {
-    const { message } = req.body || {};
-    if (!message || typeof message !== "string") {
-      return res.status(400).json({ error: "Nedostaje polje 'message'." });
+    const { message } = req.body;
+    if (!message || !message.trim()) {
+      return res.status(400).json({ error: "Prazna poruka." });
     }
 
     console.log("📩 Pitanje od korisnika:", message);
-
-    const completion = await client.chat.completions.create({
-      model: "gpt-4.1-mini",
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: message }
-      ],
-      temperature: 0.4,
-      max_tokens: 700
-    });
-
-    const answer =
-      completion.choices?.[0]?.message?.content?.trim() ||
-      "Nažalost, trenutno ne mogu da formulišem adekvatan odgovor.";
-
-    console.log("📤 Odgovor Lene:", answer);
+    const answer = await generateAnswer(message);
+    console.log("💬 Odgovor Lene:", answer);
 
     res.json({ answer });
   } catch (err) {
     console.error("❌ Greška u /api/ask:", err);
-    res
-      .status(500)
-      .json({ error: "Greška na AI servisu. Pokušajte ponovo kasnije." });
+    res.status(500).json({
+      error: "Došlo je do greške pri generisanju odgovora. Molimo pokušajte ponovo.",
+    });
   }
 });
 
-// ======================================
-//  /api/voice – ElevenLabs TTS (audio)
-// ======================================
+// 🔊 /api/voice – glasovni odgovor koristeći OpenAI TTS
 app.post("/api/voice", async (req, res) => {
   try {
-    const { text } = req.body || {};
-    if (!text || typeof text !== "string") {
-      return res.status(400).send("Nedostaje polje 'text'.");
-    }
-
-    if (!ELEVENLABS_API_KEY) {
-      console.error("❌ ELEVENLABS_API_KEY nije postavljen – nema glasa.");
-      return res.status(500).send("Glasovni servis nije konfigurisan.");
+    const { text } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ error: "Nema teksta za čitanje." });
     }
 
     console.log("🔊 Generišem glas za tekst:", text.slice(0, 120), "...");
 
-    const ttsResponse = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`,
-      {
-        method: "POST",
-        headers: {
-          "xi-api-key": ELEVENLABS_API_KEY,
-          "Content-Type": "application/json",
-          Accept: "audio/mpeg"
-        },
-        body: JSON.stringify({
-          text,
-          model_id: "eleven_multilingual_v2",
-          voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.8,
-            style: 0.3,
-            use_speaker_boost: true
-          }
-        })
-      }
-    );
-
-    if (!ttsResponse.ok) {
-      const errorText = await ttsResponse.text().catch(() => "");
-      console.error(
-        "❌ Greška iz ElevenLabs API:",
-        ttsResponse.status,
-        errorText
-      );
-      return res
-        .status(500)
-        .send("Greška prilikom generisanja glasovnog odgovora.");
-    }
-
-    const arrayBuffer = await ttsResponse.arrayBuffer();
-    const audioBuffer = Buffer.from(arrayBuffer);
-
-    res.set({
-      "Content-Type": "audio/mpeg",
-      "Content-Length": audioBuffer.length,
-      "Cache-Control": "no-store"
+    // OpenAI TTS – gpt-4o-mini-tts, ženski glas "alloy"
+    const audioResponse = await client.audio.speech.create({
+      model: "gpt-4o-mini-tts",
+      voice: "alloy",
+      input: text,
     });
 
-    return res.send(audioBuffer);
+    const buffer = Buffer.from(await audioResponse.arrayBuffer());
+
+    res.setHeader("Content-Type", "audio/mpeg");
+    res.setHeader("Content-Length", buffer.length);
+    res.send(buffer);
   } catch (err) {
-    console.error("❌ Greška u /api/voice:", err);
-    res.status(500).send("Greška na glasovnom servisu.");
+    console.error("❌ Greška u /api/voice:", err.response?.data || err.message);
+    res.status(500).json({
+      error: "Greška pri generisanju glasovnog odgovora.",
+    });
   }
 });
 
-// ======================
-//  Pokretanje servera
-// ======================
+// 🚀 Pokretanje servera
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-  console.log(`🚀 Lena backend radi na portu ${PORT}`);
+  console.log("🚀 Lena AI backend sluša na portu", PORT);
 });
