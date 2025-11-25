@@ -34,7 +34,7 @@ O NARUČIVANJU:
 - Često predloži da pacijent pošalje ortopan i napiše šta želi da mijenja,
   pa da na osnovu toga možemo dati okviran plan i ponudu.
 - Ako neko opisuje jaku bol, otok, temperaturu ili probleme sa disanjem,
-  savjetuj da se javno HITNO javi stomatologu ili hitnoj službi.
+  savjetuj da se HITNO javi stomatologu ili hitnoj službi.
 
 OGRANIČENJA:
 - Ne daješ konačnu dijagnozu; sve što pišeš je informativno.
@@ -87,7 +87,7 @@ app.post("/api/ask", async (req, res) => {
   }
 });
 
-// 🔊 /api/voice – glasovni odgovor (OpenAI TTS, ženski ton, malo sporije)
+// 🔊 /api/voice – glasovni odgovor (OpenAI TTS, ženski ton, malo brže)
 app.post("/api/voice", async (req, res) => {
   try {
     const { text } = req.body;
@@ -97,13 +97,12 @@ app.post("/api/voice", async (req, res) => {
 
     console.log("🔊 Generišem glas za tekst:", text.slice(0, 120), "...");
 
-   const audioResponse = await client.audio.speech.create({
-  model: "gpt-4o-mini-tts",
-  voice: "shimmer",   // ✳ pokušaj 1 – ženstveniji glas
-  input: text,
-  speed: 0.9          // ostavljamo smiren tempo
-});
-
+    const audioResponse = await client.audio.speech.create({
+      model: "gpt-4o-mini-tts",
+      voice: "shimmer", // ženstveniji glas
+      input: text,
+      speed: 1.05,      // malo brže od 1.0 (življe, ali i dalje smireno)
+    });
 
     const buffer = Buffer.from(await audioResponse.arrayBuffer());
 
