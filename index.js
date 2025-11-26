@@ -1,4 +1,11 @@
-// index.js — Lena AI backend (OpenAI tekst + glas, ženski ton)
+// index.js — Lena AI backend (tekst + glas, jedan poziv)
+
+/*
+  VAŽNO:
+  - OPENAI_API_KEY je u Render okruženju (Environment > Variables)
+  - Ovaj backend vraća:
+      { answer: "...", audio: "<BASE64_MP3>" }
+*/
 
 import express from "express";
 import cors from "cors";
@@ -6,7 +13,7 @@ import OpenAI from "openai";
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "2mb" }));
 
 // 🔑 OpenAI klijent – koristi OPENAI_API_KEY iz Render okruženja
 const client = new OpenAI({
@@ -23,103 +30,103 @@ OSNOVNA PRAVILA:
 - Ton ti je smiren, ženstven i profesionalan, kao da imaš 25–30 godina.
 - Ne koristiš birokratske fraze; piši kao u normalnom razgovoru, ali stručno.
 
-IMPLANTOLOGIJA I CIJENE:
-- Ako te pitaju za cijenu jednog implantata sa keramičkom krunicom:
-  objasni da se cijena najčešće kreće oko 1.250 € po zubu,
-  ali da je to okvirno i zavisi od snimka, kosti, dodatnih zahvata itd.
-- Naglasi da su cijene kod nas niže nego u Austriji ili Sloveniji,
-  jer su troškovi drugačiji, ali da koristimo savremene materijale i protokole.
+STOMATOLOŠKA PRAVILA:
+- Možeš da objašnjavaš implantate, krunice, mostove, proteze, ortodonciju,
+  izbjeljivanje, dječiju stomatologiju i dentalni turizam.
+- Uvijek naglasi da konačnu dijagnozu i plan terapije daje doktor u ordinaciji.
+- Ako pacijent opisuje jak bol, otok, temperaturu ili sumnju na infekciju –
+  naglasi hitnost pregleda uživo.
 
-O NARUČIVANJU:
-- Često predloži da pacijent pošalje ortopan i napiše šta želi da mijenja,
-  pa da na osnovu toga možemo dati okviran plan i ponudu.
-- Ako neko opisuje jaku bol, otok, temperaturu ili probleme sa disanjem,
-  savjetuj da se HITNO javi stomatologu ili hitnoj službi.
+O KLINICI DR MEĆAVA:
+- Nalazite se u Banjoj Luci.
+- Posebno ste poznati po implantatima i protetici, pacijentima iz Austrije,
+  Njemačke, Slovenije i dijaspore.
+- Cijene su značajno povoljnije nego u Austriji i Sloveniji uz visok stručni nivo.
 
-OGRANIČENJA:
-- Ne daješ konačnu dijagnozu; sve što pišeš je informativno.
-- Uvijek napomeni da plan terapije i konačnu odluku donosi doktor
-  u ordinaciji Dr Mećava u Banjoj Luci.
+KOMUNIKACIJA:
+- Odgovori treba da budu kratki, jasni i strukturirani u 1–3 paragrafa.
+- Kada pacijent pita za cijenu, možeš okvirno objasniti šta sve utiče na cijenu,
+  ali naglasi da se tačan iznos određuje nakon pregleda ili online procjene.
+- Ako je pitanje nejasno, zamoli pacijenta da pojasni ili da pošalje ortopan.
 `;
 
-// ✅ Pomoćna funkcija za generisanje teksta odgovora
-async function generateAnswer(userMessage) {
-  const response = await client.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: userMessage },
-    ],
-    temperature: 0.4,
-    max_tokens: 600,
+// 🔊 Pomoćna funkcija – iz teksta pravi BASE64 MP3
+async function textToSpeechBase64(text) {
+  const speech = await client.audio.speech.create({
+    model: "gpt-4o-mini-tts", // TTS model
+    voice: "alloy",           // ženski glas
+    input: text,
   });
 
-  const answer = response.choices[0]?.message?.content?.trim();
-  return (
-    answer ||
-    "Nažalost, trenutno ne mogu da dam precizan odgovor. Molim vas da nas kontaktirate direktno ili dođete na pregled."
-  );
+  const audioBuffer = Buffer.from(await speech.arrayBuffer());
+  return audioBuffer.toString("base64"); // vraćamo base64
 }
 
-// 🟢 Health-check ruta
-app.get("/", (_req, res) => {
-  res.send("Lena AI backend radi ✓");
-});
-
-// 📩 /api/ask – tekstualni odgovor
+// 🧠 + 🔊 Glavni endpoint — vraća i tekst i audio
 app.post("/api/ask", async (req, res) => {
   try {
-    const { message } = req.body;
-    if (!message || !message.trim()) {
-      return res.status(400).json({ error: "Prazna poruka." });
+    const { message } = req.body || {};
+    if (!message || typeof message !== "string") {
+      return res.status(400).json({ error: "Polje 'message' je obavezno." });
     }
 
-    console.log("📩 Pitanje od korisnika:", message);
-    const answer = await generateAnswer(message);
-    console.log("💬 Odgovor Lene:", answer);
+    // 1) Dobijemo tekstualni odgovor
+    const completion = await client.chat.completions.create({
+      model: "gpt-4.1-mini",
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: message },
+      ],
+    });
 
-    res.json({ answer });
+    const answer =
+      completion.choices?.[0]?.message?.content?.trim() ||
+      "Nažalost, trenutno ne mogu da formiram odgovor.";
+
+    // 2) Na osnovu tog odgovora pravimo audio (MP3) i vraćamo kao base64
+    let audioBase64 = null;
+    try {
+      audioBase64 = await textToSpeechBase64(answer);
+    } catch (e) {
+      console.error("Greška u TTS (audio):", e);
+      // Ako TTS pukne, i dalje vraćamo tekstualni odgovor
+    }
+
+    return res.json({
+      answer,
+      audio: audioBase64, // može biti null ako TTS padne
+    });
   } catch (err) {
-    console.error("❌ Greška u /api/ask:", err);
-    res.status(500).json({
-      error: "Došlo je do greške pri generisanju odgovora. Molimo pokušajte ponovo.",
+    console.error("Greška /api/ask:", err);
+    return res.status(500).json({
+      error: "Došlo je do greške na AI serveru.",
     });
   }
 });
 
-// 🔊 /api/voice – glasovni odgovor (OpenAI TTS, ženski ton, malo brže)
+// (Opcionalno) Poseban endpoint samo za glas iz proizvoljnog teksta – npr. za uvodno predstavljanje
 app.post("/api/voice", async (req, res) => {
   try {
-    const { text } = req.body;
-    if (!text || !text.trim()) {
-      return res.status(400).json({ error: "Nema teksta za čitanje." });
+    const { text } = req.body || {};
+    if (!text || typeof text !== "string") {
+      return res.status(400).json({ error: "Polje 'text' je obavezno." });
     }
 
-    console.log("🔊 Generišem glas za tekst:", text.slice(0, 120), "...");
-
-    const audioResponse = await client.audio.speech.create({
-      model: "gpt-4o-mini-tts",
-      voice: "shimmer", // ženstveniji glas
-      input: text,
-      speed: 1.05,      // malo brže od 1.0 (življe, ali i dalje smireno)
-    });
-
-    const buffer = Buffer.from(await audioResponse.arrayBuffer());
-
-    res.setHeader("Content-Type", "audio/mpeg");
-    res.setHeader("Content-Length", buffer.length);
-    res.send(buffer);
+    const audioBase64 = await textToSpeechBase64(text);
+    return res.json({ audio: audioBase64 });
   } catch (err) {
-    console.error("❌ Greška u /api/voice:", err);
-    res.status(500).json({
-      error: "Greška pri generisanju glasovnog odgovora.",
-    });
+    console.error("Greška /api/voice:", err);
+    return res.status(500).json({ error: "Greška prilikom generisanja zvuka." });
   }
 });
 
-// 🚀 Pokretanje servera
+// Health-check
+app.get("/", (req, res) => {
+  res.send("Lena AI backend radi ✅");
+});
+
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-  console.log("🚀 Lena AI backend sluša na portu", PORT);
+  console.log(`Lena AI backend sluša na portu ${PORT}`);
 });
 
