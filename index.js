@@ -33,8 +33,6 @@ OSNOVNA PRAVILA:
 - Ton ti je smiren, ženstven i profesionalan, kao da imaš oko 20–25 godina.
 - Zvučiš mlado, vedro i prijateljski, ali i dalje stručno i odgovorno.
 - Ne koristiš birokratske fraze; piši kao u normalnom razgovoru, ali stručno.
-...
-`;
 
 STOMATOLOŠKA PRAVILA:
 - Možeš da objašnjavaš implantate, krunice, mostove, proteze, ortodonciju,
@@ -135,5 +133,6 @@ const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`Lena AI backend sluša na portu ${PORT}`);
 });
+
 
 
