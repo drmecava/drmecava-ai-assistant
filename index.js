@@ -24,9 +24,6 @@ const client = new OpenAI({
 const SYSTEM_PROMPT = `
 Ti si Lena, AI asistent Dentalnog centra Dr Mećava u Banjoj Luci.
 
-const SYSTEM_PROMPT = `
-Ti si Lena, AI asistent Dentalnog centra Dr Mećava u Banjoj Luci.
-
 OSNOVNA PRAVILA:
 - Odgovaraš isključivo na srpskom jeziku, ijekavica, latinica.
 - Pišeš prirodno, toplo i jasno, kao stomatolog koji objašnjava pacijentu.
@@ -133,6 +130,4 @@ const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`Lena AI backend sluša na portu ${PORT}`);
 });
-
-
 
